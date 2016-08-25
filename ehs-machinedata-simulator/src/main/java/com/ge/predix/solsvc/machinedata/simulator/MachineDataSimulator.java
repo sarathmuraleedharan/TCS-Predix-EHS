@@ -7,22 +7,18 @@ import java.io.StringWriter;
 import java.net.URLEncoder;
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.Random;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
-import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
-import org.apache.http.client.entity.EntityBuilder;
-import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.message.BasicNameValuePair;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,149 +26,417 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
+import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.ge.predix.entity.timeseries.datapoints.ingestionrequest.Body;
+import com.ge.predix.entity.timeseries.datapoints.ingestionrequest.DatapointsIngestion;
 import com.ge.predix.solsvc.machinedata.simulator.config.Constants;
-
-import com.ge.predix.solsvc.machinedata.simulator.vo.AssetBody;
-import com.ge.predix.solsvc.machinedata.simulator.vo.EHSObjectVO;
+import com.ge.predix.solsvc.machinedata.simulator.config.Constants.Hygiene;
+import com.ge.predix.solsvc.machinedata.simulator.vo.AQIAttributesVO;
+import com.ge.predix.solsvc.machinedata.simulator.vo.AQIBody;
+import com.ge.predix.solsvc.machinedata.simulator.vo.AQIObjectVO;
+import com.ge.predix.solsvc.machinedata.simulator.vo.HygeineAtrributesVO;
+import com.ge.predix.solsvc.machinedata.simulator.vo.HygeineBody;
+import com.ge.predix.solsvc.machinedata.simulator.vo.HygeineObjectVO;
 import com.ge.predix.solsvc.restclient.impl.RestClient;
-
-
 
 /**
  * 
  * @author predix -
  */
 @Component
-public class MachineDataSimulator
-{
+public class MachineDataSimulator {
     /**
      * 
      */
-    static final Logger         log = LoggerFactory.getLogger(MachineDataSimulator.class);
-    private ObjectMapper mapper = new ObjectMapper(); 
+    static final Logger log = LoggerFactory.getLogger(MachineDataSimulator.class);
+    private ObjectMapper mapper = new ObjectMapper();
 
     public MachineDataSimulator() {
-    	mapper.configure(SerializationFeature.WRITE_NULL_MAP_VALUES,false);
-		mapper.configure(SerializationFeature.INDENT_OUTPUT,true);
-		mapper.setSerializationInclusion(Include.NON_NULL);   
-		
-	}
+        mapper.configure(SerializationFeature.WRITE_NULL_MAP_VALUES, false);
+        // mapper.configure(SerializationFeature.INDENT_OUTPUT,true);
+        mapper.setSerializationInclusion(Include.NON_NULL);
 
+    }
 
-	/**
-	 * 
-	 */
+    /**
+     * 
+     */
     @Autowired
     ApplicationProperties applicationProperties;
-    
+
     @Autowired
-	private MapperService mapperService;
+    private MapperService mapperService;
 
     @Autowired
     private RestClient restClient;
+
     /**
-     *  -
+     * -
      */
-    @Scheduled(fixedDelay=3000)
-    public void run()
-    {
-        
-        try
-        {
-           //runTest();
-        	//Sipra
-        	String areaJson = "EHS_Area_Json.json";
-        	readEHSDataAndGenerateRandomJSON(areaJson);
+    @Scheduled(fixedDelayString = "${dataingestion.sleepTimeMillis}")
+    public void run() {
+
+        try {
+            
+        	generateAndPushRandomAreaData();
         	
-        	//String machineJson = "EHS_Machine_JSON.json";
-        	//readEHSDataAndGenerateRandomJSON(machineJson);
+        	generateAndPushRandomMachineData();
         	
-        	
-        }
-        catch (Throwable e)
-        {
+        	generateAndPushRandomHygieneData();
+            
+            
+
+        } catch (Throwable e) {
             log.error("unable to run Machine DataSimulator Thread", e); //$NON-NLS-1$
         }
     }
 
-    /**
-     * @return String  Response string
-     * @throws Exception -
-     */
-    public String runTest() throws Exception
-    {
-        List<JSONData> list = generateMockDataMap_RT();
+   /* private void generateAndPushDataIngestionHygieneData() {
+        DatapointsIngestion dataPtIng = new DatapointsIngestion();
+        
+        Long currentTimeMillis = System.currentTimeMillis();
+        
+        List<Body> bodies = new ArrayList<>();
+        
+        Body body = new Body();
+        body.setName(value);
+        body.setDatapoints(datapoints);
+        body.setAttributes(value);
+        
+        dataPtIng.setBody(body);
+        dataPtIng.setMessageId(currentTimeMillis.toString());
+        
+        
+    }*/
+
+    private String generateAndPushRandomAreaData() throws JsonGenerationException, JsonMappingException, IOException {
+    	Long currentTimeMillis = System.currentTimeMillis();
     	
-        ObjectMapper mapper = new ObjectMapper();
+    	AQIObjectVO aqiObjVO = new AQIObjectVO();
+    	
+    	List<AQIBody> aqiBodyList = new ArrayList<>();
+    	
+    	AQIBody smtAreaBody = getRandomAQIDataVO(currentTimeMillis, "SMT Area", true);
+    	AQIBody prdGrndFlrBody = getRandomAQIDataVO(currentTimeMillis, "Production Ground Floor", true);
+    	AQIBody nearSoldMacBody = getRandomAQIDataVO(currentTimeMillis, "Near Soldering Machine", true);
+    	
+    	aqiBodyList.add(smtAreaBody);
+    	aqiBodyList.add(prdGrndFlrBody);
+    	aqiBodyList.add(nearSoldMacBody);
+    	
+    	aqiObjVO.setBody(aqiBodyList);
+    	aqiObjVO.setMessageId(currentTimeMillis);
+		
+				
+		DatapointsIngestion dataPtIngest = createAQIDataIngestionRequest(aqiObjVO);
+		
+		StringWriter writer = new StringWriter();
+
+		mapper.writeValue(writer, dataPtIngest);
+        System.out.println("Final JSON sending to saveTimeSeries >> "+writer.toString());
+		return postData(writer.toString());
+       // return writer.toString();
+		
+	}
+
+    private String generateAndPushRandomMachineData() throws JsonGenerationException, JsonMappingException, IOException {
+    	Long currentTimeMillis = System.currentTimeMillis();
+    	
+    	AQIObjectVO aqiObjVO = new AQIObjectVO();
+    	
+    	List<AQIBody> aqiBodyList = new ArrayList<>();
+    	
+    	AQIBody hellMchBody = getRandomAQIDataVO(currentTimeMillis, "Heller-Machine", false);
+    	AQIBody solMchBody = getRandomAQIDataVO(currentTimeMillis, "Soltech-Machine", false);
+    	AQIBody refOvnMchBody = getRandomAQIDataVO(currentTimeMillis, "Reflow-Ovan", false);
+    	AQIBody waveSoldMchBody = getRandomAQIDataVO(currentTimeMillis, "Wave-Soldering-Machine", false);
+    	
+    	aqiBodyList.add(hellMchBody);
+    	aqiBodyList.add(solMchBody);
+    	aqiBodyList.add(refOvnMchBody);
+    	aqiBodyList.add(waveSoldMchBody);
+    	
+    	aqiObjVO.setBody(aqiBodyList);
+    	aqiObjVO.setMessageId(currentTimeMillis);
+		
+			
+		DatapointsIngestion dataPtIngest = createAQIDataIngestionRequest(aqiObjVO);
+		
+		StringWriter writer = new StringWriter();
+
+		mapper.writeValue(writer, dataPtIngest);
+        System.out.println("Final JSON sending to saveTimeSeries >> "+writer.toString());
+		return postData(writer.toString());
+       // return writer.toString();
+		
+	}
+	
+
+	private String generateAndPushRandomHygieneData() throws JsonGenerationException, JsonMappingException, IOException {
+
+        Long currentTimeMillis = System.currentTimeMillis();
+        
+        HygeineObjectVO hygObjVO = new HygeineObjectVO();
+        
+        List<HygeineBody> hygBodyList = new ArrayList<>();
+        
+        
+        HygeineBody smtLine1HygBodyVo = createHygieneBodyVO(currentTimeMillis, "SMT Line 1");
+        HygeineBody smtLine2HygBodyVo = createHygieneBodyVO(currentTimeMillis, "SMT Line 2");
+        HygeineBody prdGrndFlrHygBodyVo = createHygieneBodyVO(currentTimeMillis, "Hygiene Production Ground Floor");
+        
+        hygBodyList.add(smtLine1HygBodyVo);
+        hygBodyList.add(smtLine2HygBodyVo);
+        hygBodyList.add(prdGrndFlrHygBodyVo);
+        
+        hygObjVO.setBody(hygBodyList);
+        hygObjVO.setMessageId(currentTimeMillis);
+        
+        
+        DatapointsIngestion dataPtIngest = createHygieneDataIngestionRequest(hygObjVO);
         StringWriter writer = new StringWriter();
+
+        mapper.writeValue(writer, dataPtIngest);
+        System.out.println("Final JSON sending to saveTimeSeries >> "+writer.toString());
+        return postData(writer.toString());
+       // return writer.toString();
+    
+    }
+
+    private HygeineBody createHygieneBodyVO(Long currentTimeMillis, String bodyName) {
+        HygeineBody hygBodyVo = new HygeineBody();
+        hygBodyVo.setName(bodyName);        
         
-            mapper.writeValue(writer, list);
-            return postData(writer.toString());
+        ArrayList<Long> datapoint = new ArrayList<Long>();
+        datapoint.add(currentTimeMillis);
+        datapoint.add(10l);
+        datapoint.add(1l);
         
+        ArrayList<ArrayList<Long>> datapoints = new ArrayList<>();
+        datapoints.add(datapoint);
+        hygBodyVo.setDatapoints(datapoints);
+        
+        
+        HygeineAtrributesVO hygAttVO = new HygeineAtrributesVO();
+        hygAttVO.setHumidity(getHygeineValues(Constants.Hygiene.HUMIDITY));
+        hygAttVO.setNoise(getHygeineValues(Constants.Hygiene.NOISE));
+        hygAttVO.setTemperature(getHygeineValues(Constants.Hygiene.TEMPERATURE));
+        
+        
+        hygBodyVo.setAttributes(hygAttVO);
+        return hygBodyVo;
     }
     
-    
-   /* private MessageObject getMessageObject(EHSObjectVO message) throws JsonProcessingException {
-		MessageObject messageObject = new MessageObject();
-		Long currentTimeMillis = System.currentTimeMillis();
-		ArrayList<Long> datapoint = new ArrayList<>();
-		datapoint.add(currentTimeMillis);
-		datapoint.add(10l);
-		datapoint.add(1l);
-		messageObject.setMessageId(currentTimeMillis);
-		for (AssetBody ehsArea : message.getBody()) {
+   
+
+    /**
+     * @return String Response string
+     * @throws Exception
+     *             -
+     */
+    public String runTest() throws Exception {
+        List<JSONData> list = generateMockDataMap_RT();
+
+        ObjectMapper mapper = new ObjectMapper();
+        StringWriter writer = new StringWriter();
+
+        mapper.writeValue(writer, list);
+        return postData(writer.toString());
+
+    }
+
+    /*
+     * private MessageObject getMessageObject(EHSObjectVO message) throws
+     * JsonProcessingException { MessageObject messageObject = new
+     * MessageObject(); Long currentTimeMillis = System.currentTimeMillis();
+     * ArrayList<Long> datapoint = new ArrayList<>();
+     * datapoint.add(currentTimeMillis); datapoint.add(10l); datapoint.add(1l);
+     * messageObject.setMessageId(currentTimeMillis); for (AssetBody ehsArea :
+     * message.getBody()) { Body body = new Body();
+     * 
+     * body.setO3(getValues(Constants.Parameter.O3));
+     * body.setNH3(getValues(Constants.Parameter.NH3));
+     * body.setNO2(getValues(Constants.Parameter.NO2));
+     * body.setPB(getValues(Constants.Parameter.Pb));
+     * body.setCO2(getValues(Constants.Parameter.CO));
+     * body.setSO2(getValues(Constants.Parameter.SO2));
+     * body.setPM2_5(getValues(Constants.Parameter.PM2_5));
+     * body.setPM10(getValues(Constants.Parameter.PM10));
+     * 
+     * body.setName(ehsArea.getName()); body.getDatapoints().add(datapoint);
+     * messageObject.getBody().add(body); } return messageObject; }
+     */
+
+
+	@SuppressWarnings("unchecked")
+	private DatapointsIngestion createAQIDataIngestionRequest(AQIObjectVO inputObj) throws com.fasterxml.jackson.core.JsonParseException, com.fasterxml.jackson.databind.JsonMappingException, IOException {
+
+		DatapointsIngestion dpIngestion = new DatapointsIngestion();
+		// dpIngestion.setMessageId(String.valueOf(System.currentTimeMillis()));
+		Calendar calendar = Calendar.getInstance();
+		calendar.setTime(new Date());
+		dpIngestion.setMessageId(String.valueOf(calendar.getTimeInMillis()));
+		List<Body> bodies = new ArrayList<Body>();
+
+		//
+		List<AQIBody> aqiBodies = inputObj.getBody();
+		for (AQIBody aqiBody : aqiBodies) {
+			AQIAttributesVO aqiAttributes = aqiBody.getAttributes();
+			ArrayList<ArrayList<Long>> aqiDatapoints = aqiBody.getDatapoints();
+			String aqiBodyName = aqiBody.getName();
+
+			// Create DataIngestion Object
 			Body body = new Body();
+			body.setName(aqiBodyName);
 
-			body.setO3(getValues(Constants.Parameter.O3));
-			body.setNH3(getValues(Constants.Parameter.NH3));
-			body.setNO2(getValues(Constants.Parameter.NO2));
-			body.setPB(getValues(Constants.Parameter.Pb));
-			body.setCO2(getValues(Constants.Parameter.CO));
-			body.setSO2(getValues(Constants.Parameter.SO2));
-			body.setPM2_5(getValues(Constants.Parameter.PM2_5));
-			body.setPM10(getValues(Constants.Parameter.PM10));
+			List<Object> datapoints = new ArrayList<Object>();
+			List<Object> assetDatapoint = new ArrayList<Object>();
+			assetDatapoint.add(String.valueOf(calendar.getTimeInMillis()));
+			assetDatapoint.add(aqiDatapoints.get(0).get(1));
+			assetDatapoint.add(aqiDatapoints.get(0).get(2));
 
-			body.setName(ehsArea.getName());
-			body.getDatapoints().add(datapoint);
-			messageObject.getBody().add(body);
+			datapoints.add(assetDatapoint);
+
+			body.setDatapoints(datapoints);
+
+			com.ge.predix.entity.util.map.Map map = new com.ge.predix.entity.util.map.Map();
+			map.put("CO", aqiAttributes.getCO());
+			map.put("NH3", aqiAttributes.getNH3());
+			map.put("NO2", aqiAttributes.getNO2());
+			map.put("O3", aqiAttributes.getO3());
+			map.put("PB", aqiAttributes.getPB());
+			map.put("PM10", aqiAttributes.getPM10());
+			map.put("PM2_5", aqiAttributes.getPM2_5());
+			map.put("SO2", aqiAttributes.getSO2());
+
+			body.setAttributes(map);
+			bodies.add(body);
+
 		}
-		return messageObject;
-	}*/
-    
-    private EHSObjectVO getRandomEHSObject(EHSObjectVO message, Long currentTimeMillis) throws JsonProcessingException {
-    	EHSObjectVO messageObject = new EHSObjectVO();
-		ArrayList<Long> datapoint = new ArrayList<>();
-		datapoint.add(currentTimeMillis);
-		datapoint.add(10l);
-		datapoint.add(1l);
-		messageObject.setMessageId(currentTimeMillis);
-		for (AssetBody ehsArea : message.getBody()) {
-			AssetBody body = new AssetBody();
 
-			body.setO3(getValues(Constants.Parameter.O3));
-			body.setNH3(getValues(Constants.Parameter.NH3));
-			body.setNO2(getValues(Constants.Parameter.NO2));
-			body.setPB(getValues(Constants.Parameter.Pb));
-			body.setCO2(getValues(Constants.Parameter.CO));
-			body.setSO2(getValues(Constants.Parameter.SO2));
-			body.setPM2_5(getValues(Constants.Parameter.PM2_5));
-			body.setPM10(getValues(Constants.Parameter.PM10));
+		dpIngestion.setBody(bodies);
 
-			body.setName(ehsArea.getName());
-			body.getDatapoints().add(datapoint);
-			
-			messageObject.getBody().add(body);
-			
-		}
-		return messageObject;
+		return dpIngestion;
+
 	}
+
+	// creating dataingestion connection
+	@SuppressWarnings("unchecked")
+	private DatapointsIngestion createHygieneDataIngestionRequest(HygeineObjectVO inputObj) throws com.fasterxml.jackson.core.JsonParseException, com.fasterxml.jackson.databind.JsonMappingException, IOException {
+
+		DatapointsIngestion dpIngestion = new DatapointsIngestion();
+		// dpIngestion.setMessageId(String.valueOf(System.currentTimeMillis()));
+		Calendar calendar = Calendar.getInstance();
+		calendar.setTime(new Date());
+		dpIngestion.setMessageId(String.valueOf(calendar.getTimeInMillis()));
+		List<Body> bodies = new ArrayList<Body>();
+
+		//
+		List<HygeineBody> hygBodies = inputObj.getBody();
+		for (HygeineBody hygBody : hygBodies) {
+			HygeineAtrributesVO hygAttributes = hygBody.getAttributes();
+			ArrayList<ArrayList<Long>> aqiDatapoints = hygBody.getDatapoints();
+			String aqiBodyName = hygBody.getName();
+
+			// Create DataIngestion Object
+			Body body = new Body();
+			body.setName(aqiBodyName);
+
+			List<Object> datapoints = new ArrayList<Object>();
+			List<Object> assetDatapoint = new ArrayList<Object>();
+			assetDatapoint.add(String.valueOf(calendar.getTimeInMillis()));
+			assetDatapoint.add(aqiDatapoints.get(0).get(1));
+			assetDatapoint.add(aqiDatapoints.get(0).get(2));
+
+			datapoints.add(assetDatapoint);
+
+			body.setDatapoints(datapoints);
+
+			com.ge.predix.entity.util.map.Map map = new com.ge.predix.entity.util.map.Map();
+			map.put("humidity", hygAttributes.getHumidity());
+			map.put("noise", hygAttributes.getNoise());
+			map.put("temperature", hygAttributes.getTemperature());
+			
+			body.setAttributes(map);
+			bodies.add(body);
+
+		}
+
+		dpIngestion.setBody(bodies);
+
+		return dpIngestion;
+
+	}
+
+
     
+    private AQIBody getRandomAQIDataVO(Long currentTimeMillis, String bodyName, boolean areaRequest) throws JsonProcessingException {
+      
+        AQIBody aqiBodyVo = new AQIBody();
+        
+        aqiBodyVo.setName(bodyName);
+        
+        ArrayList<Long> datapoint = new ArrayList<>();
+        datapoint.add(currentTimeMillis);
+        datapoint.add(10l);
+        datapoint.add(1l);
+        ArrayList<ArrayList<Long>> datapoints = new ArrayList<>();
+        datapoints.add(datapoint);
+        aqiBodyVo.setDatapoints(datapoints);
+       
+        AQIAttributesVO aqiAttVO = new AQIAttributesVO();
+        
+        if(areaRequest){
+        	aqiAttVO.setCO(getValues(Constants.Parameter.CO));
+        	aqiAttVO.setO3(getValues(Constants.Parameter.O3));
+        	aqiAttVO.setNH3(getValues(Constants.Parameter.NH3));
+        	aqiAttVO.setPB(getValues(Constants.Parameter.PB));
+        	aqiAttVO.setPM10(getValues(Constants.Parameter.PM10));
+        }
+    	
+    	aqiAttVO.setNO2(getValues(Constants.Parameter.NO2));    	
+    	aqiAttVO.setPM2_5(getValues(Constants.Parameter.PM2_5));
+    	aqiAttVO.setSO2(getValues(Constants.Parameter.SO2));
+    	
+        aqiBodyVo.setAttributes(aqiAttVO);
+        
+        return aqiBodyVo;
+    }
+
     
-	private Double getValues(Constants.Parameter range) {
-		Double values ;
-		// Calculating the limits of random value to be generated
+    private Double getHygeineValues(Constants.Hygiene hygiene) {
+        Double values = new Double(0);
+        Random r = new Random();
+        int minLimit = 0;
+        int maxLimit = 50000;
+        switch (hygiene) {
+        case TEMPERATURE:
+            minLimit = 20000;
+            maxLimit = 51000;
+            break;
+        case HUMIDITY:
+            minLimit = 25000;
+            maxLimit = 70000;
+            break;
+        case NOISE:
+            minLimit = 67000;
+            maxLimit = 71000;
+            break;
+
+        default:
+            break;
+        }
+        int result = r.nextInt(maxLimit - minLimit) + minLimit;
+        values = (double) ((double) result / 1000d);
+        return values;
+    }
+    
+    public Double getValues(Constants.Parameter range) {
+		Double values = new Double(0);
 		Random r = new Random();
 		int minLimit = 0;
 		int maxLimit = 50;
@@ -189,13 +453,13 @@ public class MachineDataSimulator
 			minLimit = 10;
 			maxLimit = 50;
 			break;
-		case Pb:
-			minLimit = 20;
-			maxLimit = 50;
+		case PB:
+			minLimit = 500;
+			maxLimit = 1000;
 			break;
 		case CO:
-			minLimit = 700;
-			maxLimit = 850;
+			minLimit = 1000;
+			maxLimit = 2000;
 			break;
 		case SO2:
 			minLimit = 10;
@@ -213,76 +477,146 @@ public class MachineDataSimulator
 		default:
 			break;
 		}
-		// Adding 5 random value to the array list
-		/*for (int i = 0; i < 5; i++) {
-			// generating the random value from the limit
-			int result = r.nextInt(maxLimit - minLimit) + minLimit;
-			values.add((double) result);
-		}*/
 		int result = r.nextInt(maxLimit - minLimit) + minLimit;
-		values= (double) result;
+
+		switch (range) {
+		case CO:
+			values = (double) result / 1000d;
+			break;
+		case PB:
+			values = (double) result / 1000d;
+			break;
+
+		default:
+			values = (double) result;
+			break;
+
+		}
+
 		return values;
-	}
+	} 
+   
+   /* public String readEHSDataAndGenerateRandomJSON(String jsonFileName) throws Exception {
+        // TODO: Read data from Sensor by passing current timestamp
+
+        //
+        // Generate JSON from EHS Data
+        AQIObjectVO ehsObj = mapperService.parse(jsonFileName);
+        Long currentTimeMillis = System.currentTimeMillis();
+        
+        AQIObjectVO updatedEHSObject = getRandomEHSObject(ehsObj, currentTimeMillis);
+        
+        List<AQIBody> bodyList = updatedEHSObject.getBody();
+        System.out.println("Body List: \n" + bodyList);
+        System.out.println();
+        System.out.println("--------------------------------------------------");
+        System.out.println("Random EHSObject Data: \n" + updatedEHSObject);
+
+        System.out.println("--------------------------------------------------");
+        System.out.println();
+        // ObjectMapper mapper = new ObjectMapper();
+        StringWriter writer = new StringWriter();
+
+        mapper.writeValue(writer, bodyList);
+        // String jsonString = mapper.writeValueAsString(bodyList);
+        // System.out.println("jsonString >> "+jsonString);
+        return postData(writer.toString());
+        
+        Long currentTimeMillis = System.currentTimeMillis();
+        
+        EHSObjectVO ehsObj = mapperService.parse(jsonFileName);
+        EHSObjectVO updatedEHSObject = getEHSObject(ehsObj, currentTimeMillis);
+
+        ObjectMapper mapper = new ObjectMapper();
+        List<AssetBody> bodyList = updatedEHSObject.getBody();
+        System.out.println("Body List: \n" + bodyList);
+        System.out.println();
+        System.out.println("--------------------------------------------------");
+        System.out.println("Random EHSObject Data: \n" + updatedEHSObject);
+
+        System.out.println("--------------------------------------------------");
+        System.out.println();
+        // ObjectMapper mapper = new ObjectMapper();
+        StringWriter writer = new StringWriter();
+
+        mapper.writeValue(writer, bodyList);
+        // String jsonString = mapper.writeValueAsString(bodyList);
+        // System.out.println("jsonString >> "+jsonString);
+        return postData(writer.toString());
+
+        //return postData(mapper.writeValueAsString(ehsObj));
+
+    }*/
     
-    // Added By Sipra
-	/*public String pushEHSData(String jsonFileName) throws Exception {
-		// List<JSONData> list = generateMockDataMap_RT();
-		// read from json
-		EHSObjectVO ehsObj = mapperService.parse(jsonFileName);
+    /*private EHSObjectVO getEHSObject(EHSObjectVO message, Long currentTimeMillis){
+        EHSObjectVO messageObject = new EHSObjectVO();
+        ArrayList<Long> datapoint = new ArrayList<>();
+        datapoint.add(currentTimeMillis);
+        datapoint.add(10l);
+        datapoint.add(1l);
+        messageObject.setMessageId(currentTimeMillis);
+        for (AssetBody ehsArea : message.getBody()) {
+            AssetBody body = new AssetBody();
+            if(ehsArea.getO3()!= null){
+                body.setO3(ehsArea.getO3());
+            }
+            if(ehsArea.getNH3()!= null){
+                body.setNH3(ehsArea.getNH3());
+            }
+            if(ehsArea.getNO2()!= null){
+                body.setNO2(ehsArea.getNO2());
+            }
+            if(ehsArea.getPB()!= null){
+                body.setPB(ehsArea.getPB());
+            }
+            if(ehsArea.getCO2()!= null){
+                body.setCO2(ehsArea.getCO2());
+            }
+            if(ehsArea.getSO2()!= null){
+                body.setSO2(ehsArea.getSO2());
+            }
+            if(ehsArea.getPM2_5()!= null){
+                body.setPM2_5(ehsArea.getPM2_5());
+            }
+            if(ehsArea.getPM10()!= null){
+                body.setPM10(ehsArea.getPM10());
+            }
+            
+            body.setName(ehsArea.getName());
+            body.getDatapoints().add(datapoint);
 
-		List<AssetBody> bodyList = ehsObj.getBody();
-		MessageObject messageObject = getMessageObject(ehsObj); 
-		System.out.println();
-		System.out.println("--------------------------------------------------");
-		System.out.println("Generated JSON: \n" + mapper.writeValueAsString(messageObject));
+            messageObject.getBody().add(body);
 
-		ArrayList<HashMap<String, Object>> selectedValues = pickValueFromGeneratedJson(messageObject);
-		System.out.println("Selected values from Generated JSON: \n" + mapper.writeValueAsString(selectedValues) + "\n");
+        }
+        return messageObject;
+    }*/
 
-		System.out.println("--------------------------------------------------");
-		System.out.println(); 
-		ObjectMapper mapper = new ObjectMapper();
-		StringWriter writer = new StringWriter();
+    /*
+     * private ArrayList<HashMap<String, Object>>
+     * pickValueFromGeneratedJson(MessageObject messageObject) {
+     * ArrayList<HashMap<String, Object>> values = new ArrayList<>(); for (Body
+     * body : messageObject.getBody()) { HashMap<String, Object> innerValue =
+     * new HashMap<>(); innerValue.put("name", body.getName());
+     * innerValue.put("o3", pickOneValue(body.getO3())); innerValue.put("nh3",
+     * pickOneValue(body.getNH3())); innerValue.put("no2",
+     * pickOneValue(body.getNO2())); innerValue.put("pb",
+     * pickOneValue(body.getPB())); innerValue.put("co2",
+     * pickOneValue(body.getCO2())); innerValue.put("so2",
+     * pickOneValue(body.getSO2())); innerValue.put("pm2_5",
+     * pickOneValue(body.getPM2_5())); innerValue.put("pm10",
+     * pickOneValue(body.getPM10())); values.add(innerValue); } return values; }
+     */
+    // select one of the value from the list with random index
+    private Double pickOneValue(ArrayList<Double> list) {
+        int index = new Random().nextInt(list.size());
+        return list.get(index);
+    }
 
-	//	mapper.writeValue(writer, bodyList);
-		mapper.writeValue(writer, selectedValues);
-		return postData(writer.toString());
-
-	}*/
-	
-	public String readEHSDataAndGenerateRandomJSON(String jsonFileName) throws Exception {
-		// TODO: Read data from Sensor by passing current timestamp
-		
-		//
-		//Generate JSON from EHS Data
-		EHSObjectVO ehsObj = mapperService.parse(jsonFileName);
-		Long currentTimeMillis = System.currentTimeMillis();
-		EHSObjectVO updatedEHSObject = getRandomEHSObject(ehsObj, currentTimeMillis);
-		List<AssetBody> bodyList = updatedEHSObject.getBody();
-		
-		System.out.println();
-		System.out.println("--------------------------------------------------");
-		System.out.println("Random EHSObject Data: \n" + updatedEHSObject);
-
-		System.out.println("--------------------------------------------------");
-		System.out.println(); 
-		ObjectMapper mapper = new ObjectMapper();
-		StringWriter writer = new StringWriter();
-
-		mapper.writeValue(writer, bodyList);
-		return postData(writer.toString());
-
-	}
-	
-	
-	
     /**
      * @return -
      */
-	
-	
-    List<JSONData> generateMockDataMap_RT()
-    {
+
+    List<JSONData> generateMockDataMap_RT() {
         String machineControllerId = this.applicationProperties.getMachineControllerId();
         List<JSONData> list = new ArrayList<JSONData>();
         JSONData data = new JSONData();
@@ -351,49 +685,38 @@ public class MachineDataSimulator
         return list;
     }
 
-    private Timestamp getCurrentTimestamp()
-    {
+    private Timestamp getCurrentTimestamp() {
         java.util.Date date = new java.util.Date();
         Timestamp ts = new Timestamp(date.getTime());
         return ts;
     }
 
-    private static double generateRandomUsageValue(double low, double high)
-    {
+    private static double generateRandomUsageValue(double low, double high) {
         return low + Math.random() * (high - low);
     }
     
-    
-    private String postData(String content)
-    {   	
+    private String postData(String content) {
         HttpClient client = null;
-        try
-        {
+        try {
             HttpClientBuilder builder = HttpClientBuilder.create();
-            if ( this.applicationProperties.getDiServiceProxyHost() != null
-                    && !"".equals(this.applicationProperties.getDiServiceProxyHost()) //$NON-NLS-1$
-                    && this.applicationProperties.getDiServiceProxyPort() != null
-                    && !"".equals(this.applicationProperties.getDiServiceProxyPort()) ) //$NON-NLS-1$
+            if (this.applicationProperties.getDiServiceProxyHost() != null && !"".equals(this.applicationProperties.getDiServiceProxyHost()) //$NON-NLS-1$
+                    && this.applicationProperties.getDiServiceProxyPort() != null && !"".equals(this.applicationProperties.getDiServiceProxyPort())) //$NON-NLS-1$
             {
-                HttpHost proxy = new HttpHost(this.applicationProperties.getDiServiceProxyHost(),
-                        Integer.parseInt(this.applicationProperties.getDiServiceProxyPort()));
+                HttpHost proxy = new HttpHost(this.applicationProperties.getDiServiceProxyHost(), Integer.parseInt(this.applicationProperties.getDiServiceProxyPort()));
                 builder.setProxy(proxy);
             }
-            client = builder.build(); 
+            client = builder.build();
             String serviceURL = null;
-            if ( this.applicationProperties.getPredixDataIngestionURL() == null )
-            {
-                serviceURL = "http://"+this.applicationProperties.getDiServiceHost()+":"+this.applicationProperties.getDiServicePort()+"/saveTimeSeriesData"; //$NON-NLS-1$
-                URLEncoder.encode(serviceURL,"UTF-8"); 
-            }
-            else
-            {
-                serviceURL = this.applicationProperties.getPredixDataIngestionURL()+"/saveTimeSeriesData"; //$NON-NLS-1$
-                URLEncoder.encode(serviceURL,"UTF-8"); 
+            if (this.applicationProperties.getPredixDataIngestionURL() == null) {
+                serviceURL = "http://" + this.applicationProperties.getDiServiceHost() + ":" + this.applicationProperties.getDiServicePort() + "/saveTimeSeriesData"; //$NON-NLS-1$
+                URLEncoder.encode(serviceURL, "UTF-8");
+            } else {
+                serviceURL = this.applicationProperties.getPredixDataIngestionURL() + "/saveTimeSeriesData"; //$NON-NLS-1$
+                URLEncoder.encode(serviceURL, "UTF-8");
 
             }
             log.info("Service URL : " + serviceURL); //$NON-NLS-1$
-            log.info("Data : "+content);
+            log.info("Data : " + content);
             HttpPost request = new HttpPost(serviceURL);
             HttpEntity reqEntity = MultipartEntityBuilder.create().addTextBody("content", content) //$NON-NLS-1$
                     .addTextBody("destinationId", "TimeSeries").addTextBody("clientId", "TimeSeries") //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
@@ -404,68 +727,62 @@ public class MachineDataSimulator
             BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
             StringBuffer result = new StringBuffer();
             String line = ""; //$NON-NLS-1$
-            while ((line = rd.readLine()) != null)
-            {
+            while ((line = rd.readLine()) != null) {
                 result.append(line);
             }
-            log.debug("Response : "+result.toString());
+            log.debug("Response : " + result.toString());
             if (result.toString().startsWith("You successfully posted")) { //$NON-NLS-1$
-            	return "SUCCESS : "+result.toString(); //$NON-NLS-1$
+                return "SUCCESS : " + result.toString(); //$NON-NLS-1$
             }
-			return "FAILED : "+result.toString(); //$NON-NLS-1$
+            return "FAILED : " + result.toString(); //$NON-NLS-1$
 
-        }
-        catch (Throwable e)
-        {
+        } catch (Throwable e) {
             log.error("unable to post data ", e); //$NON-NLS-1$
-            return "FAILED : "+e.getLocalizedMessage(); //$NON-NLS-1$
+            return "FAILED : " + e.getLocalizedMessage(); //$NON-NLS-1$
         }
-    } 
-    
-/*    private String postData(String content)
-    {   	
-    	List<NameValuePair> parameters = new ArrayList<NameValuePair>();
-    	parameters.add(new BasicNameValuePair("content", content));
-    	parameters.add(new BasicNameValuePair("destinationId", "TimeSeries"));
-    	parameters.add(new BasicNameValuePair("clientId", "TimeSeries"));   	
-    	parameters.add(new BasicNameValuePair("tenantId", this.applicationProperties.getTenantId()));
-    	
-    	
-    	EntityBuilder builder = EntityBuilder.create();
-    	builder.setParameters(parameters);
-    	HttpEntity reqEntity = builder.build();
-    	
-    	String serviceURL = this.applicationProperties.getPredixDataIngestionURL(); //$NON-NLS-1$
-    	if (serviceURL == null) {
-    		serviceURL = this.applicationProperties.getDiServiceURL();
-    	}
-        if (serviceURL != null) {
-	        try(CloseableHttpResponse response = restClient.post(serviceURL, reqEntity, null, 100, 1000);)
-	        {        	
-	            
-	            log.info("Service URL : " + serviceURL); //$NON-NLS-1$
-	            log.info("Data : "+content);
-	            
-	            log.debug("Send Data to Ingestion Service : Response Code : " + response.getStatusLine().getStatusCode()); //$NON-NLS-1$
-	            BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-	            StringBuffer result = new StringBuffer();
-	            String line = ""; //$NON-NLS-1$
-	            while ((line = rd.readLine()) != null)
-	            {
-	                result.append(line);
-	            }
-	            log.info("Response : "+result.toString());
-	            if (result.toString().startsWith("You successfully posted")) { //$NON-NLS-1$
-	            	return "SUCCESS : "+result.toString(); //$NON-NLS-1$
-	            }
-				return "FAILED : "+result.toString(); //$NON-NLS-1$
-	            
-	        } catch (IOException e) {
-	        	 log.error("unable to post data ", e); //$NON-NLS-1$
-	             return "FAILED : "+e.getLocalizedMessage(); //$NON-NLS-1$
-			}
-        }else{
-        	return "Dataingestion Service URL is empty.";
-        }
-    }*/
+    }
+
+    /*
+     * private String postData(String content) { List<NameValuePair> parameters
+     * = new ArrayList<NameValuePair>(); parameters.add(new
+     * BasicNameValuePair("content", content)); parameters.add(new
+     * BasicNameValuePair("destinationId", "TimeSeries")); parameters.add(new
+     * BasicNameValuePair("clientId", "TimeSeries")); parameters.add(new
+     * BasicNameValuePair("tenantId",
+     * this.applicationProperties.getTenantId()));
+     * 
+     * 
+     * EntityBuilder builder = EntityBuilder.create();
+     * builder.setParameters(parameters); HttpEntity reqEntity =
+     * builder.build();
+     * 
+     * String serviceURL =
+     * this.applicationProperties.getPredixDataIngestionURL(); //$NON-NLS-1$ if
+     * (serviceURL == null) { serviceURL =
+     * this.applicationProperties.getDiServiceURL(); } if (serviceURL != null) {
+     * try(CloseableHttpResponse response = restClient.post(serviceURL,
+     * reqEntity, null, 100, 1000);) {
+     * 
+     * log.info("Service URL : " + serviceURL); //$NON-NLS-1$ log.info("Data : "
+     * +content);
+     * 
+     * log.debug("Send Data to Ingestion Service : Response Code : " +
+     * response.getStatusLine().getStatusCode()); //$NON-NLS-1$ BufferedReader
+     * rd = new BufferedReader(new
+     * InputStreamReader(response.getEntity().getContent())); StringBuffer
+     * result = new StringBuffer(); String line = ""; //$NON-NLS-1$ while ((line
+     * = rd.readLine()) != null) { result.append(line); } log.info("Response : "
+     * +result.toString()); if (result.toString().startsWith(
+     * "You successfully posted")) { //$NON-NLS-1$ return "SUCCESS : "
+     * +result.toString(); //$NON-NLS-1$ } return "FAILED : "+result.toString();
+     * //$NON-NLS-1$
+     * 
+     * } catch (IOException e) { log.error("unable to post data ", e);
+     * //$NON-NLS-1$ return "FAILED : "+e.getLocalizedMessage(); //$NON-NLS-1$ }
+     * }else{ return "Dataingestion Service URL is empty."; } }
+     */
 }
+
+
+
+

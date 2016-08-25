@@ -1,20 +1,9 @@
 package com.ge.predix.solsvc.machinedata.simulator.vo;
 
-
-import java.util.ArrayList;
-
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-@JsonAutoDetect(fieldVisibility = Visibility.ANY, getterVisibility = Visibility.NONE, setterVisibility = Visibility.NONE)
-public class AssetBody {
+public class AQIAttributesVO {
 
-	@JsonProperty("name")
-	private String name;
-	@JsonProperty("datapoints")
-	private ArrayList<ArrayList<Long>> datapoints = new ArrayList<ArrayList<Long>>();
-	
 	@JsonProperty("O3")
 	private Double O3;
 	
@@ -27,8 +16,8 @@ public class AssetBody {
 	@JsonProperty("PB")
 	private Double PB;
 	
-	@JsonProperty("CO2")
-	private Double CO2;
+	@JsonProperty("CO")
+	private Double CO;
 	
 	@JsonProperty("SO2")
 	private Double SO2;
@@ -38,24 +27,6 @@ public class AssetBody {
 	
 	@JsonProperty("PM10")
 	private Double PM10;
-
-	public String getName() {
-		return name;
-	}
-
-	public void setName(String name) {
-		this.name = name;
-	}
-
-	
-
-	public ArrayList<ArrayList<Long>> getDatapoints() {
-		return datapoints;
-	}
-
-	public void setDatapoints(ArrayList<ArrayList<Long>> datapoints) {
-		this.datapoints = datapoints;
-	}
 
 	public Double getO3() {
 		return O3;
@@ -89,12 +60,12 @@ public class AssetBody {
 		PB = pB;
 	}
 
-	public Double getCO2() {
-		return CO2;
+	public Double getCO() {
+		return CO;
 	}
 
-	public void setCO2(Double cO2) {
-		CO2 = cO2;
+	public void setCO(Double cO) {
+		CO = cO;
 	}
 
 	public Double getSO2() {
@@ -121,10 +92,11 @@ public class AssetBody {
 		PM10 = pM10;
 	}
 
-	
-
-	
-
+	@Override
+	public String toString() {
+		return "AQIAttributesVO [O3=" + O3 + ", NH3=" + NH3 + ", NO2=" + NO2 + ", PB=" + PB + ", CO=" + CO + ", SO2="
+				+ SO2 + ", PM2_5=" + PM2_5 + ", PM10=" + PM10 + "]";
+	}
 	
 	
 }

@@ -3,11 +3,13 @@ package com.ge.predix.solsvc.machinedata.simulator.vo;
 import java.util.ArrayList;
 import java.util.List;
 
-public class EHSObjectVO {
+public class AQIObjectVO {
 	
 	private Long messageId;
 	
-	private List<AssetBody> body = new ArrayList<AssetBody>();
+	private List<AQIBody> body = new ArrayList<AQIBody>();
+	
+	
 
 	public Long getMessageId() {
 		return messageId;
@@ -17,11 +19,11 @@ public class EHSObjectVO {
 		this.messageId = messageId;
 	}
 
-	public List<AssetBody> getBody() {
+	public List<AQIBody> getBody() {
 		return body;
 	}
 
-	public void setBody(List<AssetBody> body) {
+	public void setBody(List<AQIBody> body) {
 		this.body = body;
 	}
 
@@ -29,8 +31,7 @@ public class EHSObjectVO {
 	public String toString() {
 		return "EHSObjectVO [messageId=" + messageId + ", body=" + body + "]";
 	}
+	
 
-	
-	
 	
 }

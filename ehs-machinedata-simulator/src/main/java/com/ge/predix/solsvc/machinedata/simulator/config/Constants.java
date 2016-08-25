@@ -6,7 +6,14 @@ public class Constants {
 	};
 
 	public static enum Parameter {
-		PM10, PM2_5,NO2, O3, CO, SO2, NH3, Pb
+		PM10, PM2_5,NO2, O3, CO, SO2, NH3, PB
 	};
+	
+	public static enum Hygiene {
+		TEMPERATURE, HUMIDITY, NOISE
+	};
+
+	public static String hygieneAreas[] = new String[] { "SMT Line 1", "SMT Line 2", "Production Ground Floor" };
 }
+
 
