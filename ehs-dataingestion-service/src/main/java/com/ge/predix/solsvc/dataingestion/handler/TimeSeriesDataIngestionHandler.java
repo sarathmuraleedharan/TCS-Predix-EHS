@@ -3,6 +3,7 @@ package com.ge.predix.solsvc.dataingestion.handler;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,12 +17,14 @@ import org.apache.http.message.BasicHeader;
 import org.apache.log4j.Logger;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.JsonMappingException;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.type.TypeReference;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.ge.predix.entity.asset.Asset;
 import com.ge.predix.entity.asset.AssetTag;
 import com.ge.predix.entity.timeseries.datapoints.ingestionrequest.Body;
@@ -29,7 +32,8 @@ import com.ge.predix.entity.timeseries.datapoints.ingestionrequest.DatapointsIng
 import com.ge.predix.solsvc.dataingestion.api.Constants;
 import com.ge.predix.solsvc.dataingestion.service.type.JSONData;
 import com.ge.predix.solsvc.dataingestion.vo.AssetBody;
-import com.ge.predix.solsvc.dataingestion.vo.EHSObjectVO;
+import com.ge.predix.solsvc.dataingestion.vo.AssetObject;
+
 import com.ge.predix.solsvc.dataingestion.websocket.WebSocketClient;
 import com.ge.predix.solsvc.dataingestion.websocket.WebSocketConfig;
 import com.ge.predix.solsvc.ext.util.JsonMapper;
@@ -61,11 +65,14 @@ public class TimeSeriesDataIngestionHandler extends BaseFactory {
 
 	@Autowired
 	private JsonMapper jsonMapper;
-	
-	private Map<String,Asset> assetMap = new HashMap<String,Asset>();
+
+	private Map<String, Map<String, AssetObject>> assetMap = new HashMap<String, Map<String, AssetObject>>();
 
 	@Autowired
 	private TimeseriesRestConfig timeseriesRestConfig;
+
+	@Autowired
+	Environment evn;
 
 	/**
 	 * -
@@ -77,45 +84,57 @@ public class TimeSeriesDataIngestionHandler extends BaseFactory {
 	}
 
 	/**
-	 * @param data -
-	 * @param authorization -
+	 * @param data
+	 *            -
+	 * @param authorization
+	 *            -
 	 */
 	@SuppressWarnings("nls")
 	public void handleData(String data, String authorization) {
 		log.info("Data from Simulator : " + data);
 		List<Header> headers = this.restClient.getSecureTokenForClientId();
-	this.restClient.addZoneToHeaders(headers, this.timeseriesRestConfig.getZoneId());
+		this.restClient.addZoneToHeaders(headers, this.timeseriesRestConfig.getZoneId());
 		headers.add(new BasicHeader("Origin", "http://localhost"));
 		try {
 			ObjectMapper mapper = new ObjectMapper();
+			mapper.configure(SerializationFeature.WRITE_NULL_MAP_VALUES, false);
+			mapper.configure(SerializationFeature.INDENT_OUTPUT, true);
+			mapper.setSerializationInclusion(Include.NON_NULL);
+			// Changes Start Sipra
+			@SuppressWarnings("unchecked")
+			DatapointsIngestion dpIngestion = (DatapointsIngestion) mapper.readValue(data, new com.fasterxml.jackson.core.type.TypeReference<DatapointsIngestion>() {});
 			
-			//Changes Start Sipra
-		//	List<JSONData> list = mapper.readValue(data, new TypeReference<List<JSONData>>() {
-			List<AssetBody> list = mapper.readValue(data, new TypeReference<List<AssetBody>>() {
-				//
-			});
-			log.debug("TimeSeries URL : " + this.tsInjectionWSConfig.getInjectionUri());
-			log.debug("WebSocket URL : " + this.wsConfig.getPredixWebSocketURI());
-			//Sipra
-		//	DatapointsIngestion dpIngestion = createTimeseriesDataBody(list, authorization);
-			String assetURI = "/Geography/001";
-			
-			DatapointsIngestion dpIngestion = createTimeseriesDataBody(list, assetURI, authorization);
+			log.info("TimeSeries URL : " + this.tsInjectionWSConfig.getInjectionUri());
+			log.info("WebSocket URL : " + this.wsConfig.getPredixWebSocketURI());
+			// Sipra
+			String machineValue = evn.getProperty("user.asset.machineValue");
+			Map<String, AssetObject> assetObjectMap = this.assetMap
+					.get(machineValue);
+			if (assetObjectMap == null) {
+				assetObjectMap = assetDataHandler
+						.retriveAssetObjects(authorization);
+				this.assetMap.put(machineValue, assetObjectMap);
+			}
 			log.info("TimeSeries JSON : " + this.jsonMapper.toJson(dpIngestion));
 			if (dpIngestion.getBody() != null && dpIngestion.getBody().size() > 0) {
 				// commented by sipra
 				//this.wsClient.postToWebSocketServer(this.jsonMapper.toJson(dpIngestion));
 				log.info("Posted Data to Predix Websocket Server");
 
+				this.timeSeriesFactory.createConnectionToTimeseriesWebsocket(headers);
 				this.timeSeriesFactory.postDataToTimeseriesWebsocket(dpIngestion, headers);
+				this.timeSeriesFactory.closeConnectionToTimeseriesWebsocket();
 				log.info("Posted Data to Timeseries");
 			}
 
 		} catch (JsonParseException e) {
+			e.printStackTrace();
 			throw new RuntimeException(e);
 		} catch (JsonMappingException e) {
+			e.printStackTrace();
 			throw new RuntimeException(e);
 		} catch (IOException e) {
+			e.printStackTrace();
 			throw new RuntimeException(e);
 		}
 	}
@@ -134,7 +153,7 @@ public class TimeSeriesDataIngestionHandler extends BaseFactory {
 
 		Body body = new Body();
 		body.setName(assetTag.getSourceTagId());
-		//Sipra
+		// Sipra
 		// attributes
 		com.ge.predix.entity.util.map.Map map = new com.ge.predix.entity.util.map.Map();
 		map.put("assetId", asset.getAssetId());
@@ -143,12 +162,11 @@ public class TimeSeriesDataIngestionHandler extends BaseFactory {
 			map.put("sourceTagId", sourceTagAttribute);
 		}
 		body.setAttributes(map);
-		//Sipra
+		// Sipra
 		// datapoints
 		List<Object> datapoint1 = new ArrayList<Object>();
 		datapoint1.add(converLocalTimeToUtcTime(json.getTimestamp().getTime()));
-		Double convertedValue = getConvertedValue(assetTag.getTagDatasource().getNodeName(),
-				Double.parseDouble(json.getValue().toString()));
+		Double convertedValue = getConvertedValue(assetTag.getTagDatasource().getNodeName(), Double.parseDouble(json.getValue().toString()));
 		datapoint1.add(convertedValue);
 
 		List<Object> datapoints = new ArrayList<Object>();
@@ -162,116 +180,111 @@ public class TimeSeriesDataIngestionHandler extends BaseFactory {
 
 		return dpIngestion;
 	}
+	
+	/*private DatapointsIngestion ingestEHSDataInTimeSeries(EHSDataVO ehsData,
+			String machineValue, String authorization) throws com.fasterxml.jackson.core.JsonParseException, com.fasterxml.jackson.databind.JsonMappingException, IOException {
 
-	@SuppressWarnings({ "unchecked", "nls" })
-	//Sipra
-	//private DatapointsIngestion createTimeseriesDataBody(List<JSONData> jsonData, String authorization) {
-		private DatapointsIngestion createTimeseriesDataBody(List<AssetBody> jsonData, String machineValue, String authorization) {
 		DatapointsIngestion dpIngestion = new DatapointsIngestion();
-		dpIngestion.setMessageId(String.valueOf(System.currentTimeMillis()));
+		// dpIngestion.setMessageId(String.valueOf(System.currentTimeMillis()));
+		Calendar calendar = Calendar.getInstance();
+		calendar.setTime(new Date());
+		dpIngestion.setMessageId(String.valueOf(calendar.getTimeInMillis()));
 		List<Body> bodies = new ArrayList<Body>();
 
+		Map<String, AssetObject> assetObjectMap = this.assetMap
+				.get(machineValue);
+		if (assetObjectMap == null) {
+			assetObjectMap = assetDataHandler
+					.retriveAssetObjects(authorization);
+			this.assetMap.put(machineValue, assetObjectMap);
+		}
+		//
+		List<EHSBody> ehsBodies = ehsData.getBody();
+		for (EHSBody ehsBody : ehsBodies) {
+			EHSAttributesVO ehsAttributes = ehsBody.getAttributes();
+			List<List<Long>> ehsDatapoints = ehsBody.getDatapoints();
+			String ehsBodyName = ehsBody.getName();
+
+			// Create DataIngestion Object
+			Body body = new Body();
+			body.setName(ehsBodyName);
+
+			List<Object> datapoints = new ArrayList<Object>();
+			List<Object> assetDatapoint = new ArrayList<Object>();
+			assetDatapoint.add(String.valueOf(calendar.getTimeInMillis()));
+			assetDatapoint.add(ehsDatapoints.get(0).get(1));
+			assetDatapoint.add(ehsDatapoints.get(0).get(2));
+
+			datapoints.add(assetDatapoint);
+
+			body.setDatapoints(datapoints);
+
+			com.ge.predix.entity.util.map.Map map = new com.ge.predix.entity.util.map.Map();
+			map.put("smtAreaData", ehsAttributes.getSmtAreaData());
+			map.put("prodGrdData", ehsAttributes.getSmtAreaData());
+			map.put("nearSolderngMchnData", ehsAttributes.getSmtAreaData());
+
+			body.setAttributes(map);
+			bodies.add(body);
+
+		}
+
+		dpIngestion.setBody(bodies);
+
+		return dpIngestion;
+
+	}*/
+
+	@SuppressWarnings({ "unchecked", "nls" })
+	// Modified by Sarath
+	private DatapointsIngestion createTimeseriesDataBody(List<AssetBody> jsonData, String machineValue, String authorization)
+			throws com.fasterxml.jackson.core.JsonParseException, com.fasterxml.jackson.databind.JsonMappingException, IOException {
+		DatapointsIngestion dpIngestion = new DatapointsIngestion();
+		//dpIngestion.setMessageId(String.valueOf(System.currentTimeMillis()));
+		Calendar calendar = Calendar.getInstance();
+		calendar.setTime(new Date());
+		dpIngestion.setMessageId(String.valueOf(calendar.getTimeInMillis())); 
+		List<Body> bodies = new ArrayList<Body>();
+
+		Map<String, AssetObject> assetObjectMap = this.assetMap.get(machineValue);
+		if (assetObjectMap == null) {
+			assetObjectMap = assetDataHandler.retriveAssetObjects(authorization);
+			this.assetMap.put(machineValue, assetObjectMap);
+		}
+
 		for (AssetBody data : jsonData) {
-			
-			String filter = "attributes.machineControllerId.value";
-			//String value = "/asset/Bently.Nevada.3500.Rack" + data.getUnit();
-			//Sipra
-			String value = machineValue;//"/Geography/1";
-			String nodeName = data.getName();
-			Asset asset = this.assetMap.get(value);
-			if (asset == null) {
-				asset = this.assetDataHandler.retrieveAsset(null, filter, value, authorization);
-				if (asset == null) {
-					throw new RuntimeException("Error retriving asset for filter=" + filter + "=" + value); //$NON-NLS-1$
-				}
-				this.assetMap.put(value, asset);
-			}
-			if (asset != null) {
-				LinkedHashMap<String, AssetTag> tags = asset.getAssetTag();
-				if (tags != null) {
-					AssetTag assetTag = getAssetTag(asset.getAssetTag(), nodeName);
-					Body body = new Body();
-					body.setName(assetTag.getSourceTagId());
-					// attributes
-					com.ge.predix.entity.util.map.Map map = new com.ge.predix.entity.util.map.Map();
-					map.put("assetId", asset.getAssetId());
-					if (!StringUtils.isEmpty(assetTag.getSourceTagId())) {
-						String sourceTagAttribute = assetTag.getSourceTagId().split(":")[1];
-						map.put("sourceTagId", sourceTagAttribute);
-					}
-					body.setAttributes(map);
+			AssetObject assetObject = assetObjectMap.get(data.getName());
+			// String value = "/asset/Bently.Nevada.3500.Rack" + data.getUnit();
+			// Sipra
+			// String value = machineValue;// "/Geography/1";
+			if (assetObject != null) {
+				Body body = new Body();
+				body.setName(data.getName());
+				com.ge.predix.entity.util.map.Map map = new com.ge.predix.entity.util.map.Map();
+				List<Object> datapoints = new ArrayList<Object>();
+				Long currentUTCTimeFromObject = converLocalTimeToUtcTime(data.getDatapoints().get(0).get(0));
+				List<Object> assetDatapoint = new ArrayList<Object>();
+				//assetDatapoint.add(currentUTCTimeFromObject);
+				assetDatapoint.add(String.valueOf(calendar.getTimeInMillis()));
+				assetDatapoint.add(data.getDatapoints().get(0).get(1));
+				assetDatapoint.add(data.getDatapoints().get(0).get(2));
 
-					// datapoints
-				//	List<Object> datapoint1 = new ArrayList<Object>();
-					/*datapoint1.add(converLocalTimeToUtcTime(data.getTimestamp().getTime()));
-					Double convertedValue = getConvertedValue(assetTag.getTagDatasource().getNodeName(),
-							Double.parseDouble(data.getValue().toString()));*/
-					//datapoint1.add(convertedValue);
-					
-						
-					// Sipra
+				datapoints.add(assetDatapoint);
 
-					List<Object> datapoints = new ArrayList<Object>();
-					
-					Long currentUTCTimeFromObject = converLocalTimeToUtcTime(data.getDatapoints().get(0).get(0));
-					
-					List<Object> assetDatapoint = new ArrayList<Object>();					
-					assetDatapoint.add(currentUTCTimeFromObject);
-					assetDatapoint.add(data.getDatapoints().get(0).get(1));
-					assetDatapoint.add(data.getDatapoints().get(0).get(2));
-					
-					List<Object> CO2Datapoint = new ArrayList<Object>();					
-					CO2Datapoint.add(currentUTCTimeFromObject);
-					CO2Datapoint.add(data.getCO2());
-					
-					List<Object> nameDatapoint = new ArrayList<Object>();					
-					nameDatapoint.add(currentUTCTimeFromObject);
-					nameDatapoint.add(data.getName());
-					
-					List<Object> NH3Datapoint = new ArrayList<Object>();					
-					NH3Datapoint.add(currentUTCTimeFromObject);
-					NH3Datapoint.add(data.getNH3());
-					
-					List<Object> NO2Datapoint = new ArrayList<Object>();					
-					NO2Datapoint.add(currentUTCTimeFromObject);
-					NO2Datapoint.add(data.getNO2());
-					
-					List<Object> O3Datapoint = new ArrayList<Object>();					
-					O3Datapoint.add(currentUTCTimeFromObject);
-					O3Datapoint.add(data.getO3());
-					
-					List<Object> PBDatapoint = new ArrayList<Object>();					
-					PBDatapoint.add(currentUTCTimeFromObject);
-					PBDatapoint.add(data.getPB());
-					
-					List<Object> PM10Datapoint = new ArrayList<Object>();					
-					PM10Datapoint.add(currentUTCTimeFromObject);
-					PM10Datapoint.add(data.getPM10());
-					
-					List<Object> PM25Datapoint = new ArrayList<Object>();					
-					PM25Datapoint.add(currentUTCTimeFromObject);
-					PM25Datapoint.add(data.getPM2_5());
-					
-					List<Object> SO2Datapoint = new ArrayList<Object>();					
-					SO2Datapoint.add(currentUTCTimeFromObject);
-					SO2Datapoint.add(data.getSO2());
-					
-					
-					datapoints.add(assetDatapoint);
-					datapoints.add(CO2Datapoint);
-					datapoints.add(nameDatapoint);
-					datapoints.add(NH3Datapoint);
-					datapoints.add(NO2Datapoint);
-					datapoints.add(O3Datapoint);
-					datapoints.add(PBDatapoint);
-					datapoints.add(PM10Datapoint);
-					datapoints.add(PM25Datapoint);					
-					datapoints.add(SO2Datapoint);
-					
-					body.setDatapoints(datapoints);
+				body.setDatapoints(datapoints);
+				
+				map.put("NO2", data.getNO2());
+				map.put("SO2", data.getSO2());
+				map.put("PM2_5", data.getPM2_5());
+				map.put("O3", data.getO3());
+				map.put("NH3", data.getNH3());
+				map.put("PB", data.getPB());
+				map.put("CO2", data.getCO2());
+				map.put("PM10", data.getPM10());
+				
+				body.setAttributes(map);
 
-					bodies.add(body);
-				}
+				bodies.add(body);
 			}
 		}
 
@@ -336,8 +349,7 @@ public class TimeSeriesDataIngestionHandler extends BaseFactory {
 			for (Entry<String, AssetTag> entry : tags.entrySet()) {
 				AssetTag assetTag = entry.getValue();
 				// TagDatasource dataSource = assetTag.getTagDatasource();
-				if (assetTag != null && !assetTag.getSourceTagId().isEmpty() && nodeName != null
-						&& nodeName.toLowerCase().contains(assetTag.getSourceTagId().toLowerCase())) {
+				if (assetTag != null && !assetTag.getSourceTagId().isEmpty() && nodeName != null && nodeName.toLowerCase().contains(assetTag.getSourceTagId().toLowerCase())) {
 					ret = assetTag;
 					return ret;
 				}

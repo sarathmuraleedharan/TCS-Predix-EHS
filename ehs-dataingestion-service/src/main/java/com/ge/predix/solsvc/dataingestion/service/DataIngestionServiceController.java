@@ -19,7 +19,6 @@ import com.ge.predix.entity.asset.AssetTag;
 import com.ge.predix.entity.asset.TagDatasource;
 import com.ge.predix.solsvc.dataingestion.api.DataIngestionServiceAPI;
 import com.ge.predix.solsvc.dataingestion.handler.DataIngestionHandler;
-import com.ge.predix.solsvc.dataingestion.vo.EHSObjectVO;
 
 /**
  * 
