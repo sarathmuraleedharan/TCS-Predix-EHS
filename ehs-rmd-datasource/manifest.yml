@@ -2,7 +2,7 @@
 applications:
   - name: ehs-rmd-datasource1
     buildpack: java_buildpack
-    path: target/rmd-datasource-2.0.0.jar
+    path: target/ehs-rmd-datasource-2.0.0.jar
     memory: 1GB
     instances: 1
     services:
