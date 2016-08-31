@@ -8,13 +8,11 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.ge.predix.entity.timeseries.datapoints.queryresponse.DatapointsResponse;
 import com.ge.predix.entity.timeseries.datapoints.queryresponse.Results;
 import com.ge.predix.entity.timeseries.datapoints.queryresponse.Tag;
 import com.ge.predix.entity.util.map.Map;
-import com.ge.predix.solsvc.experience.datasource.handlers.utils.TimeSeriesHygieneParser.ResponseObjectCollections;
+import com.ge.predix.solsvc.experience.datasource.datagrid.service.HygieneResponseObject;
 
 @Component
 public class TimeSeriesHygieneParser {
@@ -37,7 +35,7 @@ public class TimeSeriesHygieneParser {
 		return value;
 	}
 
-	public Object parseForResponse(List<ResponseObject> list, String name) {
+	public Object parseForResponse(List<HygieneResponseObject> list, String name) {
 		java.util.Map<String, Object> map = new HashMap<>();
 		List<Long> timestamps = new ArrayList<>();
 		List<Float> humidity = new ArrayList<>();
@@ -61,7 +59,7 @@ public class TimeSeriesHygieneParser {
 	public Object parseForResponse(List<ResponseObjectCollections> list) {
 		List<Object> returnList = new ArrayList<>();
 		for (int j = 0; j < list.size(); j++) {
-			List<ResponseObject> innerList = list.get(j).getResponseObjects();
+			List<HygieneResponseObject> innerList = list.get(j).getResponseObjects();
 			java.util.Map<String, Object> innerMap = new HashMap<>();
 			List<Long> timestamps = new ArrayList<>();
 			List<Float> humidity = new ArrayList<>();
@@ -89,12 +87,12 @@ public class TimeSeriesHygieneParser {
 			for (int j = 0; j < datapointsResponse.getTags().size(); j++) {
 				ResponseObjectCollections responseObjectCollectionsObject = new ResponseObjectCollections();
 				Tag tag = datapointsResponse.getTags().get(j);
-				List<ResponseObject> list = new ArrayList<ResponseObject>();
+				List<HygieneResponseObject> list = new ArrayList<HygieneResponseObject>();
 
 				List<Results> results = tag.getResults();
 				for (int i = 0; i < results.size(); i++) {
 
-					ResponseObject responseObject = new ResponseObject();
+					HygieneResponseObject responseObject = new HygieneResponseObject();
 
 					Map attributes = results.get(i).getAttributes();
 					List<Object> values = results.get(i).getValues();
@@ -105,13 +103,12 @@ public class TimeSeriesHygieneParser {
 
 					responseObject.setTimestamp(getValue(values));
 					list.add(responseObject);
-
-					Collections.sort(list, new Comparator<ResponseObject>() {
-						public int compare(ResponseObject r1, ResponseObject r2) {
-							return (int) (r1.getTimestamp() - r2.getTimestamp());
-						}
-					});
 				}
+				Collections.sort(list, new Comparator<HygieneResponseObject>() {
+					public int compare(HygieneResponseObject r1, HygieneResponseObject r2) {
+						return (int) (r1.getTimestamp() - r2.getTimestamp());
+					}
+				});
 
 				responseObjectCollectionsObject.setName(tag.getName());
 				responseObjectCollectionsObject.setResponseObjects(list);
@@ -126,14 +123,14 @@ public class TimeSeriesHygieneParser {
 	}
 
 	public class ResponseObjectCollections {
-		private List<ResponseObject> responseObjects = new ArrayList<>();
+		private List<HygieneResponseObject> responseObjects = new ArrayList<>();
 		private String name;
 
-		public List<ResponseObject> getResponseObjects() {
+		public List<HygieneResponseObject> getResponseObjects() {
 			return responseObjects;
 		}
 
-		public void setResponseObjects(List<ResponseObject> responseObjects) {
+		public void setResponseObjects(List<HygieneResponseObject> responseObjects) {
 			this.responseObjects = responseObjects;
 		}
 
@@ -146,44 +143,4 @@ public class TimeSeriesHygieneParser {
 		}
 	}
 
-	@JsonInclude(Include.NON_NULL)
-	public class ResponseObject {
-		private Long timestamp;
-		private Float humidity;
-		private Float noise;
-		private Float temperature;
-
-		public Long getTimestamp() {
-			return timestamp;
-		}
-
-		public void setTimestamp(Long timestamp) {
-			this.timestamp = timestamp;
-		}
-
-		public Float getHumidity() {
-			return humidity;
-		}
-
-		public void setHumidity(Float humidity) {
-			this.humidity = humidity;
-		}
-
-		public Float getNoise() {
-			return noise;
-		}
-
-		public void setNoise(Float noise) {
-			this.noise = noise;
-		}
-
-		public Float getTemperature() {
-			return temperature;
-		}
-
-		public void setTemperature(Float temperature) {
-			this.temperature = temperature;
-		}
-
-	}
 }

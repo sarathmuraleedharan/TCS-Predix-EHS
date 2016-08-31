@@ -106,12 +106,19 @@ public class AqiCalculations {
 			} else {
 				isPM10Available = false;
 			}
+			try {
+				AQI maxAqi = Collections.max(values, new AQIComparator());
+				maxAqiValues.add(maxAqi);
+			} catch (Exception e) {
 
-			AQI maxAqi = Collections.max(values, new AQIComparator());
-			AQI minAqi = Collections.min(values, new AQIComparator());
+			}
 
-			maxAqiValues.add(maxAqi);
-			minAqiValues.add(minAqi);
+			try {
+				AQI minAqi = Collections.min(values, new AQIComparator());
+				minAqiValues.add(minAqi);
+			} catch (Exception e) {
+
+			}
 
 			timestamps.add(responseObject.getTimestamp());
 		}
@@ -172,11 +179,17 @@ public class AqiCalculations {
 			overallAqiResponse.getSeperatedResult().add(gv);
 		}
 
-		AQI maxAqiGlobal = Collections.max(maxAqiValues, new AQIComparator());
-		AQI minAqiGlobal = Collections.min(minAqiValues, new AQIComparator());
+		try {
+			AQI maxAqiGlobal = Collections.max(maxAqiValues, new AQIComparator());
+			overallAqiResponse.setMaxAqi(maxAqiGlobal);
+		} catch (Exception e) {
+		}
 
-		overallAqiResponse.setMaxAqi(maxAqiGlobal);
-		overallAqiResponse.setMinAqi(minAqiGlobal);
+		try {
+			AQI minAqiGlobal = Collections.min(minAqiValues, new AQIComparator());
+			overallAqiResponse.setMinAqi(minAqiGlobal);
+		} catch (Exception e) {
+		}
 
 		overallAqiResponse.setValue(getGraphValueList(maxAqiValues));
 
@@ -228,6 +241,25 @@ public class AqiCalculations {
 		private List<Long> timestamps = new ArrayList<>();
 		private Long startTime;
 		private Long endTime;
+		private String assetName;
+
+		private Object attributes;
+
+		public Object getAttributes() {
+			return attributes;
+		}
+
+		public void setAttributes(Object attributes) {
+			this.attributes = attributes;
+		}
+
+		public String getAssetName() {
+			return assetName;
+		}
+
+		public void setAssetName(String assetName) {
+			this.assetName = assetName;
+		}
 
 		public List<Long> getTimestamps() {
 			return timestamps;

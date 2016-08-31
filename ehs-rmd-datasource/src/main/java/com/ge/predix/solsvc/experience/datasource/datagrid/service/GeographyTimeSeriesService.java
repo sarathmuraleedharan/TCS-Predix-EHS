@@ -27,6 +27,7 @@ import com.ge.predix.solsvc.experience.datasource.handlers.MachineSimulater;
 import com.ge.predix.solsvc.experience.datasource.handlers.utils.AqiCalculations;
 import com.ge.predix.solsvc.experience.datasource.handlers.utils.AqiCalculations.OverallAqiResponse;
 import com.ge.predix.solsvc.experience.datasource.handlers.utils.TimeSeriesAqiParser;
+import com.ge.predix.solsvc.experience.datasource.handlers.utils.TimeSeriesAqiParser.AqiResponseObjectCollections;
 import com.ge.predix.solsvc.experience.datasource.handlers.utils.TimeSeriesAqiParser.ResponseObject;
 
 @Consumes({ "application/json" })
@@ -94,21 +95,20 @@ public class GeographyTimeSeriesService {
 	@Path("/lastWeekHighestAQI")
 	public ResponseEntity<Object> lastWeekHighestAQI(@QueryParam("asset_name") String assetName, @HeaderParam(value = "authorization") String authorization) throws Throwable {
 		Long twentyFourHours = 24l * 60l * 60l * 1000l;
-		
-		
-		//Long lastWeek = twentyFourHours * 7; // 7 days
-		
-		// Since timeseries don't have correct value for last week. So we using last day. 
+
+		// Long lastWeek = twentyFourHours * 7; // 7 days
+
+		// Since timeseries don't have correct value for last week. So we using
+		// last day.
 		Long lastWeek = twentyFourHours * 1; // 1 days
-		
+
 		Long tenMin = 10l * 60l * 1000l;
 		Long lastWeek10MinBefore = lastWeek + tenMin; // 7 days
 
 		Calendar calendar = Calendar.getInstance();
 		calendar.setTime(new Date());
 		Long currentTime = calendar.getTimeInMillis();
-		
-		
+
 		String start_time = String.valueOf(currentTime - lastWeek10MinBefore);
 		String end_time = String.valueOf(currentTime - lastWeek);
 
@@ -120,11 +120,11 @@ public class GeographyTimeSeriesService {
 		DatapointsResponse datapointsResponse = geographyDatasourceHandler.getGeographyResponse(assetName, authorization, start_time, end_time);
 		List<ResponseObject> list = timeSeriesAqiParser.parse(datapointsResponse);
 		OverallAqiResponse overallAqiResponse = aqiCalculations.calculateAqiMachine(list, Long.parseLong(start_time), Long.parseLong(end_time));
-		
+
 		Map<String, Object> resMap = new HashMap<String, Object>();
 		resMap.put("maxAqi", overallAqiResponse.getMaxAqi());
 		resMap.put("assetName", assetName);
-		
+
 		return new ResponseEntity<Object>(resMap, HttpStatus.OK);
 	}
 
@@ -171,6 +171,22 @@ public class GeographyTimeSeriesService {
 	}
 
 	@GET
+	@Path("/appDashBoard")
+	public ResponseEntity<Object> appDashboard(@HeaderParam(value = "authorization") String authorization) throws Throwable {
+		Long min20 = 20l * 60l * 1000l; // 20sec
+		Calendar calendar = Calendar.getInstance();
+		calendar.setTime(new Date());
+		Long currentTime = calendar.getTimeInMillis();
+		String start_time = String.valueOf(currentTime - min20);
+		String end_time = String.valueOf(currentTime);
+
+		DatapointsResponse datapointsResponse = geographyDatasourceHandler.getGeographyResponse(authorization, start_time, end_time);
+		List<AqiResponseObjectCollections> list = timeSeriesAqiParser.parseFromMultipleTags(datapointsResponse);
+		List<OverallAqiResponse> parseForResponse = timeSeriesAqiParser.parseForResponse(list, Long.parseLong(start_time), Long.parseLong(end_time));
+		return new ResponseEntity<Object>(parseForResponse, HttpStatus.OK);
+	}
+
+	@GET
 	@Path("/last20Sec")
 	public ResponseEntity<Object> getGeographySummaryLast20Sec(@QueryParam("asset_name") String assetName, @HeaderParam(value = "authorization") String authorization) throws Throwable {
 		Long twentySec = 20l * 1000l; // 20sec in ms
@@ -191,7 +207,7 @@ public class GeographyTimeSeriesService {
 		return new ResponseEntity<Object>(overallAqiResponse, HttpStatus.OK);
 	}
 
-	/*@Autowired
+	@Autowired
 	MachineSimulater machineSimulater;
 
 	@GET
@@ -216,6 +232,6 @@ public class GeographyTimeSeriesService {
 	@Path("/generatedArea20Sec")
 	public ResponseEntity<Map<String, Object>> generatedArea20Hrs(@QueryParam("asset_name") String assetName) throws Throwable {
 		return new ResponseEntity<Map<String, Object>>(machineSimulater.getGeneratedDataAreaLast20Sec(assetName), HttpStatus.OK);
-	}*/
+	}
 
 }

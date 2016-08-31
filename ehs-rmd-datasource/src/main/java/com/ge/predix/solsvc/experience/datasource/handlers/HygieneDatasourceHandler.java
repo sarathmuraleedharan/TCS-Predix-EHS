@@ -120,7 +120,6 @@ public class HygieneDatasourceHandler {
 			tag.setName(Constants.hygieneAreas[i]);
 			tag.setLimit(10);
 			tags.add(tag);
-
 		}
 		datapointsQuery.setTags(tags);
 

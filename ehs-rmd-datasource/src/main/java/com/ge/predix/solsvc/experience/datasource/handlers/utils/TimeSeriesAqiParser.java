@@ -3,8 +3,10 @@ package com.ge.predix.solsvc.experience.datasource.handlers.utils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -13,10 +15,14 @@ import com.ge.predix.entity.timeseries.datapoints.queryresponse.DatapointsRespon
 import com.ge.predix.entity.timeseries.datapoints.queryresponse.Results;
 import com.ge.predix.entity.timeseries.datapoints.queryresponse.Tag;
 import com.ge.predix.entity.util.map.Map;
+import com.ge.predix.solsvc.experience.datasource.handlers.utils.AqiCalculations.AQI;
+import com.ge.predix.solsvc.experience.datasource.handlers.utils.AqiCalculations.GraphValues;
+import com.ge.predix.solsvc.experience.datasource.handlers.utils.AqiCalculations.OverallAqiResponse;
 
 @Component
 public class TimeSeriesAqiParser {
-	
+	@Autowired
+	AqiCalculations aqiCalculations;
 
 	private Float getValue(Map attributes, String key) {
 		Float value = null;
@@ -26,6 +32,7 @@ public class TimeSeriesAqiParser {
 		}
 		return value;
 	}
+
 	private Long getValue(List<Object> values) {
 		Long value = null;
 		try {
@@ -41,7 +48,7 @@ public class TimeSeriesAqiParser {
 			Tag tag = datapointsResponse.getTags().get(0);
 			List<Results> results = tag.getResults();
 			for (int i = 0; i < results.size(); i++) {
-				
+
 				ResponseObject responseObject = new ResponseObject();
 
 				Map attributes = results.get(i).getAttributes();
@@ -72,8 +79,76 @@ public class TimeSeriesAqiParser {
 		return list;
 
 	}
-	
-	
+
+	public List<AqiResponseObjectCollections> parseFromMultipleTags(DatapointsResponse datapointsResponse) {
+		List<AqiResponseObjectCollections> responseObjectCollections = new ArrayList<>();
+		try {
+			for (int j = 0; j < datapointsResponse.getTags().size(); j++) {
+				AqiResponseObjectCollections responseObjectCollectionsObject = new AqiResponseObjectCollections();
+				Tag tag = datapointsResponse.getTags().get(j);
+				List<ResponseObject> list = new ArrayList<ResponseObject>();
+
+				List<Results> results = tag.getResults();
+				for (int i = 0; i < results.size(); i++) {
+
+					ResponseObject responseObject = new ResponseObject();
+
+					Map attributes = results.get(i).getAttributes();
+					List<Object> values = results.get(i).getValues();
+
+					responseObject.setNO2(getValue(attributes, "NO2"));
+					responseObject.setPM2_5(getValue(attributes, "PM2_5"));
+					responseObject.setPB(getValue(attributes, "PB"));
+					responseObject.setO3(getValue(attributes, "O3"));
+					responseObject.setCO2(getValue(attributes, "CO2"));
+					responseObject.setSO2(getValue(attributes, "SO2"));
+					responseObject.setNH3(getValue(attributes, "NH3"));
+					responseObject.setPM10(getValue(attributes, "PM10"));
+
+					responseObject.setTimestamp(getValue(values));
+					list.add(responseObject);
+
+				}
+
+				Collections.sort(list, new Comparator<ResponseObject>() {
+					public int compare(ResponseObject r1, ResponseObject r2) {
+						return (int) (r1.getTimestamp() - r2.getTimestamp());
+					}
+				});
+
+				responseObjectCollectionsObject.setName(tag.getName());
+				responseObjectCollectionsObject.setResponseObjects(list);
+				responseObjectCollections.add(responseObjectCollectionsObject);
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return responseObjectCollections;
+
+	}
+
+	public class AqiResponseObjectCollections {
+		private List<ResponseObject> responseObjects = new ArrayList<>();
+		private String name;
+
+		public List<ResponseObject> getResponseObjects() {
+			return responseObjects;
+		}
+
+		public void setResponseObjects(List<ResponseObject> responseObjects) {
+			this.responseObjects = responseObjects;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
 	@JsonInclude(Include.NON_NULL)
 	public class ResponseObject {
 		private Long timestamp;
@@ -158,5 +233,47 @@ public class TimeSeriesAqiParser {
 			PM10 = pM10;
 		}
 
+	}
+
+	public List<OverallAqiResponse> parseForResponse(List<AqiResponseObjectCollections> list, Long startTime, Long endTime) {
+		List<OverallAqiResponse> returnList = new ArrayList<>();
+		for (int j = 0; j < list.size(); j++) {
+			OverallAqiResponse calculateAqiMachine = aqiCalculations.calculateAqiMachine(list.get(j).getResponseObjects(), startTime, endTime);
+			calculateAqiMachine.setAssetName(list.get(j).getName());
+
+			
+			
+			List<java.util.Map<String, Object>> attributes = new ArrayList<>();
+			try {
+				for (int i = 0; i < calculateAqiMachine.getSeperatedResult().size(); i++) {
+					GraphValues graphValues = calculateAqiMachine.getSeperatedResult().get(i);
+					java.util.Map<String, Object> map = new HashMap<String, Object>();
+					Float maxValue = Collections.max(graphValues.getValues(), new FloatComparator());
+					map.put(graphValues.getName().toString(), maxValue);
+					attributes.add(map);
+				}
+			} catch (Exception e) {
+			}
+			calculateAqiMachine.setAttributes(attributes);
+			
+			
+			// for the dash board we do not need the seperatedResult (its for
+			// plotting graphs), values and timestamps
+			calculateAqiMachine.setSeperatedResult(new ArrayList<>());
+			calculateAqiMachine.setValue(new ArrayList<>());
+			calculateAqiMachine.setTimestamps(new ArrayList<>());
+
+			
+
+			returnList.add(calculateAqiMachine);
+		}
+		return returnList;
+	}
+
+	static class FloatComparator implements Comparator<Float> {
+		@Override
+		public int compare(Float f1, Float f2) {
+			return (int) (f1 * 1000f - f2 * 1000f);
+		}
 	}
 }

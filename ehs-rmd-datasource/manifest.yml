@@ -1,8 +1,8 @@
 #inherit: base-manifest.yml
 applications:
-  - name: ehs-rmd-datasource1
+  - name: ehs-rmd-datasource2
     buildpack: java_buildpack
-    path: target/ehs-rmd-datasource-2.0.0.jar
+    path: target/rmd-datasource-2.0.0.jar
     memory: 1GB
     instances: 1
     services:
