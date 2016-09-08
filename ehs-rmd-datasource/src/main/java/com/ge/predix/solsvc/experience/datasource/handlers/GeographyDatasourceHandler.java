@@ -1,5 +1,7 @@
 package com.ge.predix.solsvc.experience.datasource.handlers;
 
+import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -14,6 +16,7 @@ import com.ge.predix.entity.timeseries.datapoints.queryrequest.DatapointsQuery;
 import com.ge.predix.entity.timeseries.datapoints.queryrequest.Group;
 import com.ge.predix.entity.timeseries.datapoints.queryrequest.Tag;
 import com.ge.predix.entity.timeseries.datapoints.queryresponse.DatapointsResponse;
+import com.ge.predix.entity.timeseries.datapoints.queryresponse.Results;
 import com.ge.predix.solsvc.experience.datasource.handlers.HygieneDatasourceHandler.MyGroup;
 import com.ge.predix.solsvc.experience.datasource.handlers.utils.Constants;
 import com.ge.predix.solsvc.restclient.impl.RestClient;
@@ -134,6 +137,58 @@ public class GeographyDatasourceHandler {
 		System.out.println("Response : " + objectMapper.writeValueAsString(response));
 
 		return response;
+	}
+	
+	
+	public String getAllFloorGeographyResponse(String id, String authorization, String start_time, String end_time) throws JsonProcessingException, UnsupportedEncodingException {
+
+		ObjectMapper objectMapper = new ObjectMapper();
+
+		//creating list of headers and pass it to rest client
+		List<Header> headers = new ArrayList<Header>();
+		restClient.addSecureTokenToHeaders(headers, authorization);
+		restClient.addZoneToHeaders(headers, timeseriesRestConfig.getZoneId());
+
+		DatapointsQuery datapointsQuery = new DatapointsQuery();
+		datapointsQuery.setStart(Long.parseLong(start_time));
+		datapointsQuery.setEnd(Long.parseLong(end_time));
+		Tag tag = new Tag();
+		tag.setName(id);
+		tag.setLimit(10);
+		tag.setOrder("desc");
+			
+		List<Tag> tags = new ArrayList<>();
+		tags.add(tag);
+		datapointsQuery.setTags(tags);
+
+		System.out.println(objectMapper.writeValueAsString(datapointsQuery));
+
+		DatapointsResponse response = timeseriesFactory.queryForDatapoints(timeseriesRestConfig.getBaseUrl(), datapointsQuery, headers);
+		response.setStart(Double.parseDouble(start_time));
+		response.setEnd(Double.parseDouble(end_time));
+		
+		String allFloorJson = parseAndDecodeAllFloorData(response);
+		
+
+		return allFloorJson;
+	}
+
+
+	private String parseAndDecodeAllFloorData(DatapointsResponse response)
+			throws UnsupportedEncodingException {
+		String allFloorJSON = "";
+		for(com.ge.predix.entity.timeseries.datapoints.queryresponse.Tag respTag: response.getTags()){
+			if("ALL_FLOOR_DATA".equals(respTag.getName())){
+				for (Results results:respTag.getResults()){
+					ByteBuffer allfloorBuffer = (ByteBuffer) results.getAttributes().get("allfloorData");
+					allFloorJSON = new String(allfloorBuffer.array(), "UTF-8");
+					 
+					 System.out.println("ALL FLOOR JSON ::::: "+allFloorJSON);
+					 break;
+				}
+			}
+		}
+		return allFloorJSON;
 	}
 	
 	

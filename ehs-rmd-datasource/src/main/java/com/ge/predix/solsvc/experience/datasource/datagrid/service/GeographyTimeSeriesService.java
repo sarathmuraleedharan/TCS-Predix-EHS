@@ -206,6 +206,26 @@ public class GeographyTimeSeriesService {
 		OverallAqiResponse overallAqiResponse = aqiCalculations.calculateAqiMachine(list, Long.parseLong(start_time), Long.parseLong(end_time));
 		return new ResponseEntity<Object>(overallAqiResponse, HttpStatus.OK);
 	}
+	
+	@GET
+	@Path("/last24hrsAllFloorData")
+	public ResponseEntity<String> getAllFloorGeoDataLast24Hr(@QueryParam("asset_name") String assetName, @HeaderParam(value = "authorization") String authorization) throws Throwable {
+		Long twentyFourHours = 24l * 60l * 60l * 1000l; // 24 hs in ms
+		Calendar calendar = Calendar.getInstance();
+		calendar.setTime(new Date());
+		Long currentTime = calendar.getTimeInMillis();
+		String start_time = String.valueOf(currentTime - twentyFourHours);
+		String end_time = String.valueOf(currentTime);
+
+		log.info("id : " + assetName);//ALL_FLOOR_DATA
+		log.info("authorization : " + authorization);
+		log.info("start_time : " + start_time);
+		log.info("end_time : " + end_time);
+
+		String jsonResponse = geographyDatasourceHandler.getAllFloorGeographyResponse(assetName, authorization, start_time, end_time);
+
+		return new ResponseEntity<String>(jsonResponse, HttpStatus.OK);
+	}
 
 	@Autowired
 	MachineSimulater machineSimulater;
