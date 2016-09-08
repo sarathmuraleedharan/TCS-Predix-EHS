@@ -6,7 +6,7 @@
 			"datapoints": [
 				[1453338376222, 10, 1]
 			],
-			"O3": 30,
+			"attributes":{"O3": 30,
 			"NH3": 45,
 			"NO2": 33,
 			"PB":22,
@@ -14,6 +14,7 @@
 			"SO2": 52,
 			"PM2_5": 43,
 			"PM10": 76	
+			}
 		},
 		{
 		"name": "Production Ground Floor",

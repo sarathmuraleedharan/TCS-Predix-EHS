@@ -10,20 +10,18 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ge.predix.solsvc.machinedata.simulator.vo.AQIObjectVO;
+import com.ge.predix.solsvc.machinedata.simulator.vo.EHSObjectVO;
 
 @Component
 public class MapperService {
 	@Autowired
 	private ResourceLoader resourceLoader;
 
-	public AQIObjectVO parse(String jsonFileName) throws IOException {
+	public EHSObjectVO parse(String jsonFileName) throws IOException {
 		ObjectMapper mapper = new ObjectMapper();
 		//mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 		Resource resource = resourceLoader.getResource("classpath:"+jsonFileName);
 		File jsonFile = resource.getFile();
-		return mapper.readValue(jsonFile, AQIObjectVO.class);
+		return mapper.readValue(jsonFile, EHSObjectVO.class);
 	}
-	
-	
 }
