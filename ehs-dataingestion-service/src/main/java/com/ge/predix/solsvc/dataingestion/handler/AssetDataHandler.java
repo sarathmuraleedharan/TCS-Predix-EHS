@@ -74,10 +74,12 @@ public class AssetDataHandler extends BaseFactory {
 		String predix_zone_id = assetRestConfig.getZoneId();
 
 		SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+		//Sipra
 		//Proxy proxy = new Proxy(Type.HTTP, new InetSocketAddress("proxy.tcs.com", 8080));
-		//Proxy proxy = new Proxy(Type.HTTP, new InetSocketAddress("pitc-zscaler-aspac-bangalore3pr.proxy.corporate.ge.com", 443));
+		Proxy proxy = new Proxy(Type.HTTP, new InetSocketAddress("pitc-zscaler-aspac-bangalore3pr.proxy.corporate.ge.com", 443));
 		
-		//requestFactory.setProxy(proxy);
+		requestFactory.setProxy(proxy);
+		
 		RestTemplate restTemplate = new RestTemplate(requestFactory);
 
 		HttpHeaders headers = new HttpHeaders();
@@ -133,8 +135,10 @@ public class AssetDataHandler extends BaseFactory {
 
 			final String uri = "https://predix-asset.run.aws-usw02-pr.ice.predix.io/Geography/001";
 			SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-			//Proxy proxy = new Proxy(Type.HTTP, new InetSocketAddress("pitc-zscaler-aspac-bangalore3pr.proxy.corporate.ge.com", 443));
-			//requestFactory.setProxy(proxy);
+			//Sipra
+			Proxy proxy = new Proxy(Type.HTTP, new InetSocketAddress("pitc-zscaler-aspac-bangalore3pr.proxy.corporate.ge.com", 443));
+			requestFactory.setProxy(proxy);
+			
 			RestTemplate restTemplate = new RestTemplate(requestFactory);
 			HttpHeaders headers1 = new HttpHeaders();
 			headers1.setAccept(Arrays.asList(MediaType.APPLICATION_JSON));
